@@ -1,0 +1,973 @@
+openapi: 3.0.3
+info:
+  title: Mock API - Influencer Management System
+  description: |
+    A comprehensive API for managing social media influencers across multiple platforms.
+    This API provides authentication, user management, and influencer CRUD operations.
+    
+    ## Features
+    - JWT-based authentication
+    - Role-based access control (admin/viewer)
+    - Influencer management with filtering and pagination
+    - Multi-platform support (Instagram, YouTube, TikTok, X, Facebook)
+    - Advanced search and sorting capabilities
+    
+    ## Authentication
+    Most endpoints require authentication. Include the JWT token in the Authorization header:
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+    
+    ## Rate Limiting
+    No rate limiting is currently implemented.
+    
+    ## Error Handling
+    All errors follow a consistent format with error codes and messages.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: ISC
+    url: https://opensource.org/licenses/ISC
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+  - url: https://api.example.com
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization endpoints
+  - name: Users
+    description: User profile and management endpoints
+  - name: Influencers
+    description: Influencer CRUD operations and search
+  - name: Health
+    description: System health and status endpoints
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Check if the API is running and healthy
+      operationId: getHealth
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+              example:
+                status: "ok"
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user with email and password to receive JWT token
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              admin_user:
+                summary: Admin user login
+                value:
+                  email: "admin@example.com"
+                  password: "Admin123!"
+              viewer_user:
+                summary: Viewer user login
+                value:
+                  email: "viewer@example.com"
+                  password: "Viewer123!"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                success: true
+                data:
+                  access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  user:
+                    id: "u-admin"
+                    email: "admin@example.com"
+                    role: "admin"
+                    name: "Admin"
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "BAD_REQUEST"
+                  message: "Invalid login body"
+                  details:
+                    fieldErrors:
+                      email: ["Invalid email"]
+                      password: ["Password must be at least 6 characters"]
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "INVALID_CREDENTIALS"
+                  message: "Email or password is incorrect"
+
+  /auth/me:
+    get:
+      tags:
+        - Users
+      summary: Get current user profile
+      description: Retrieve the profile of the currently authenticated user
+      operationId: getCurrentUser
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+              example:
+                success: true
+                data:
+                  id: "u-admin"
+                  email: "admin@example.com"
+                  role: "admin"
+                  name: "Admin"
+        '401':
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "UNAUTHORIZED"
+                  message: "Token required"
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "NOT_FOUND"
+                  message: "User not found"
+
+  /influencers:
+    get:
+      tags:
+        - Influencers
+      summary: List influencers
+      description: |
+        Retrieve a paginated list of influencers with optional filtering and sorting.
+        
+        ## Filtering Options
+        - **platform**: Filter by social media platform
+        - **country**: Filter by country (ISO-2 code)
+        - **min_followers**: Filter by minimum follower count
+        - **category**: Filter by influencer category
+        - **name**: Search by influencer name (partial match)
+        - **q**: General search across name, bio, category, and platform
+        
+        ## Sorting Options
+        - **sort**: Sort by followers, engagementRate, or createdAt
+        - **order**: Sort direction (asc or desc)
+        
+        ## Pagination
+        - **cursor**: Pagination cursor for next page
+        - **limit**: Number of items per page (default: 20, max: 100)
+      operationId: listInfluencers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          description: Pagination cursor for next page
+          required: false
+          schema:
+            type: string
+          example: "eyJjcmVhdGVkQXQiOiIyMDI0LTAxLTE1VDEwOjAwOjAwLjAwMFoiLCJpZCI6ImV4YW1wbGUtaWQifQ=="
+        - name: limit
+          in: query
+          description: Number of items per page (default: 20, max: 100)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+        - name: platform
+          in: query
+          description: Filter by social media platform
+          required: false
+          schema:
+            type: string
+            enum: ["Instagram", "YouTube", "TikTok", "X", "Facebook"]
+          example: "Instagram"
+        - name: country
+          in: query
+          description: Filter by country (ISO-2 code)
+          required: false
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 2
+          example: "US"
+        - name: min_followers
+          in: query
+          description: Filter by minimum follower count
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+          example: 10000
+        - name: category
+          in: query
+          description: Filter by influencer category
+          required: false
+          schema:
+            type: string
+            minLength: 2
+          example: "Tech"
+        - name: name
+          in: query
+          description: Search by influencer name (partial match)
+          required: false
+          schema:
+            type: string
+            minLength: 1
+          example: "John"
+        - name: q
+          in: query
+          description: General search across name, bio, category, and platform
+          required: false
+          schema:
+            type: string
+            minLength: 1
+          example: "tech influencer"
+        - name: sort
+          in: query
+          description: Sort field
+          required: false
+          schema:
+            type: string
+            enum: ["followers", "engagementRate", "createdAt"]
+            default: "createdAt"
+          example: "followers"
+        - name: order
+          in: query
+          description: Sort direction
+          required: false
+          schema:
+            type: string
+            enum: ["asc", "desc"]
+            default: "desc"
+          example: "desc"
+      responses:
+        '200':
+          description: Influencers retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InfluencerListResponse'
+              example:
+                success: true
+                data:
+                  - id: "inf-123"
+                    name: "John Tech Guru"
+                    platform: "Instagram"
+                    country: "US"
+                    followers: 50000
+                    engagementRate: 3.2
+                    category: "Tech"
+                    bio: "Tech enthusiast and content creator"
+                    avatar: "https://example.com/avatar1.jpg"
+                    createdAt: "2024-01-15T10:00:00.000Z"
+                  - id: "inf-124"
+                    name: "Sarah Fashionista"
+                    platform: "YouTube"
+                    country: "UK"
+                    followers: 75000
+                    engagementRate: 4.1
+                    category: "Fashion"
+                    bio: "Fashion and lifestyle content"
+                    avatar: "https://example.com/avatar2.jpg"
+                    createdAt: "2024-01-14T15:30:00.000Z"
+                pageInfo:
+                  hasNextPage: true
+                  hasPreviousPage: false
+                  startCursor: "eyJjcmVhdGVkQXQiOiIyMDI0LTAxLTE1VDEwOjAwOjAwLjAwMFoiLCJpZCI6ImluZi0xMjMifQ=="
+                  endCursor: "eyJjcmVhdGVkQXQiOiIyMDI0LTAxLTE0VDE1OjMwOjAwLjAwMFoiLCJpZCI6ImluZi0xMjQifQ=="
+                total: 2000
+        '401':
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "UNAUTHORIZED"
+                  message: "Token required"
+
+    post:
+      tags:
+        - Influencers
+      summary: Create new influencer
+      description: Create a new influencer (admin only)
+      operationId: createInfluencer
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InfluencerCreateRequest'
+            examples:
+              tech_influencer:
+                summary: Tech influencer
+                value:
+                  name: "Alex Developer"
+                  platform: "YouTube"
+                  country: "US"
+                  followers: 25000
+                  engagementRate: 5.8
+                  category: "Tech"
+                  bio: "Software developer sharing coding tips"
+                  avatar: "https://example.com/avatar3.jpg"
+              fashion_influencer:
+                summary: Fashion influencer
+                value:
+                  name: "Emma Style"
+                  platform: "Instagram"
+                  country: "UK"
+                  followers: 100000
+                  engagementRate: 3.5
+                  category: "Fashion"
+                  bio: "Fashion blogger and style consultant"
+      responses:
+        '201':
+          description: Influencer created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Influencer'
+              example:
+                success: true
+                data:
+                  id: "inf-new-123"
+                  name: "Alex Developer"
+                  platform: "YouTube"
+                  country: "US"
+                  followers: 25000
+                  engagementRate: 5.8
+                  category: "Tech"
+                  bio: "Software developer sharing coding tips"
+                  avatar: "https://example.com/avatar3.jpg"
+                  createdAt: "2024-01-15T12:00:00.000Z"
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "BAD_REQUEST"
+                  message: "Invalid body"
+                  details:
+                    fieldErrors:
+                      followers: ["Expected number, received string"]
+                      platform: ["Invalid platform. Expected 'Instagram' | 'YouTube' | 'TikTok' | 'X' | 'Facebook'"]
+        '401':
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "UNAUTHORIZED"
+                  message: "Token required"
+        '403':
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "FORBIDDEN"
+                  message: "Admin role required"
+
+  /influencers/{id}:
+    get:
+      tags:
+        - Influencers
+      summary: Get influencer by ID
+      description: Retrieve a specific influencer by their unique ID
+      operationId: getInfluencer
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Influencer ID
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: "inf-123"
+      responses:
+        '200':
+          description: Influencer retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Influencer'
+              example:
+                success: true
+                data:
+                  id: "inf-123"
+                  name: "John Tech Guru"
+                  platform: "Instagram"
+                  country: "US"
+                  followers: 50000
+                  engagementRate: 3.2
+                  category: "Tech"
+                  bio: "Tech enthusiast and content creator"
+                  avatar: "https://example.com/avatar1.jpg"
+                  createdAt: "2024-01-15T10:00:00.000Z"
+        '401':
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "UNAUTHORIZED"
+                  message: "Token required"
+        '404':
+          description: Influencer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "NOT_FOUND"
+                  message: "Influencer not found"
+
+    patch:
+      tags:
+        - Influencers
+      summary: Update influencer
+      description: Partially update an existing influencer (admin only)
+      operationId: updateInfluencer
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Influencer ID
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: "inf-123"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InfluencerPatchRequest'
+            examples:
+              update_followers:
+                summary: Update follower count
+                value:
+                  followers: 60000
+              update_bio:
+                summary: Update bio
+                value:
+                  bio: "Updated bio with new information"
+              multiple_updates:
+                summary: Multiple field updates
+                value:
+                  followers: 60000
+                  engagementRate: 4.0
+                  bio: "Updated bio with new information"
+      responses:
+        '200':
+          description: Influencer updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Influencer'
+              example:
+                success: true
+                data:
+                  id: "inf-123"
+                  name: "John Tech Guru"
+                  platform: "Instagram"
+                  country: "US"
+                  followers: 60000
+                  engagementRate: 4.0
+                  category: "Tech"
+                  bio: "Updated bio with new information"
+                  avatar: "https://example.com/avatar1.jpg"
+                  createdAt: "2024-01-15T10:00:00.000Z"
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "BAD_REQUEST"
+                  message: "Invalid body"
+                  details:
+                    fieldErrors:
+                      followers: ["Expected number, received string"]
+        '401':
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "UNAUTHORIZED"
+                  message: "Token required"
+        '403':
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "FORBIDDEN"
+                  message: "Admin role required"
+        '404':
+          description: Influencer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "NOT_FOUND"
+                  message: "Influencer not found"
+
+    delete:
+      tags:
+        - Influencers
+      summary: Delete influencer
+      description: Delete an existing influencer (admin only)
+      operationId: deleteInfluencer
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Influencer ID
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: "inf-123"
+      responses:
+        '200':
+          description: Influencer deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+              example:
+                success: true
+                data:
+                  id: "inf-123"
+        '401':
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "UNAUTHORIZED"
+                  message: "Token required"
+        '403':
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "FORBIDDEN"
+                  message: "Admin role required"
+        '404':
+          description: Influencer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "NOT_FOUND"
+                  message: "Influencer not found"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /auth/login endpoint
+
+  schemas:
+    # Authentication Schemas
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "admin@example.com"
+        password:
+          type: string
+          minLength: 6
+          description: User's password (minimum 6 characters)
+          example: "Admin123!"
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            access_token:
+              type: string
+              description: JWT access token
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            user:
+              $ref: '#/components/schemas/UserProfile'
+
+    # User Schemas
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique user identifier
+          example: "u-admin"
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "admin@example.com"
+        role:
+          type: string
+          enum: ["admin", "viewer"]
+          description: User's role in the system
+          example: "admin"
+        name:
+          type: string
+          description: User's display name
+          example: "Admin"
+
+    # Influencer Schemas
+    Influencer:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique influencer identifier
+          example: "inf-123"
+        name:
+          type: string
+          minLength: 2
+          description: Influencer's display name
+          example: "John Tech Guru"
+        platform:
+          type: string
+          enum: ["Instagram", "YouTube", "TikTok", "X", "Facebook"]
+          description: Social media platform
+          example: "Instagram"
+        country:
+          type: string
+          minLength: 2
+          maxLength: 2
+          description: Country code (ISO-2)
+          example: "US"
+        followers:
+          type: integer
+          minimum: 0
+          description: Number of followers
+          example: 50000
+        engagementRate:
+          type: number
+          minimum: 0
+          description: Engagement rate percentage
+          example: 3.2
+        category:
+          type: string
+          minLength: 2
+          description: Influencer category
+          example: "Tech"
+        bio:
+          type: string
+          description: Influencer's bio/description
+          example: "Tech enthusiast and content creator"
+        avatar:
+          type: string
+          format: uri
+          description: URL to influencer's avatar image
+          example: "https://example.com/avatar1.jpg"
+        createdAt:
+          type: string
+          format: date-time
+          description: When the influencer was created
+          example: "2024-01-15T10:00:00.000Z"
+
+    InfluencerCreateRequest:
+      type: object
+      required:
+        - name
+        - platform
+        - country
+        - followers
+        - engagementRate
+        - category
+      properties:
+        name:
+          type: string
+          minLength: 2
+          description: Influencer's display name
+          example: "Alex Developer"
+        platform:
+          type: string
+          enum: ["Instagram", "YouTube", "TikTok", "X", "Facebook"]
+          description: Social media platform
+          example: "YouTube"
+        country:
+          type: string
+          minLength: 2
+          maxLength: 2
+          description: Country code (ISO-2)
+          example: "US"
+        followers:
+          type: integer
+          minimum: 0
+          description: Number of followers
+          example: 25000
+        engagementRate:
+          type: number
+          minimum: 0
+          description: Engagement rate percentage
+          example: 5.8
+        category:
+          type: string
+          minLength: 2
+          description: Influencer category
+          example: "Tech"
+        bio:
+          type: string
+          description: Influencer's bio/description
+          default: ""
+          example: "Software developer sharing coding tips"
+        avatar:
+          type: string
+          format: uri
+          description: URL to influencer's avatar image
+          example: "https://example.com/avatar3.jpg"
+
+    InfluencerPatchRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          description: Influencer's display name
+          example: "Alex Developer"
+        platform:
+          type: string
+          enum: ["Instagram", "YouTube", "TikTok", "X", "Facebook"]
+          description: Social media platform
+          example: "YouTube"
+        country:
+          type: string
+          minLength: 2
+          maxLength: 2
+          description: Country code (ISO-2)
+          example: "US"
+        followers:
+          type: integer
+          minimum: 0
+          description: Number of followers
+          example: 25000
+        engagementRate:
+          type: number
+          minimum: 0
+          description: Engagement rate percentage
+          example: 5.8
+        category:
+          type: string
+          minLength: 2
+          description: Influencer category
+          example: "Tech"
+        bio:
+          type: string
+          description: Influencer's bio/description
+          example: "Software developer sharing coding tips"
+        avatar:
+          type: string
+          format: uri
+          description: URL to influencer's avatar image
+          example: "https://example.com/avatar3.jpg"
+
+    # Response Schemas
+    InfluencerListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Influencer'
+        pageInfo:
+          type: object
+          properties:
+            hasNextPage:
+              type: boolean
+              description: Whether there are more pages available
+              example: true
+            hasPreviousPage:
+              type: boolean
+              description: Whether there are previous pages available
+              example: false
+            startCursor:
+              type: string
+              description: Cursor for the first item on this page
+              example: "eyJjcmVhdGVkQXQiOiIyMDI0LTAxLTE1VDEwOjAwOjAwLjAwMFoiLCJpZCI6ImluZi0xMjMifQ=="
+            endCursor:
+              type: string
+              description: Cursor for the last item on this page
+              example: "eyJjcmVhdGVkQXQiOiIyMDI0LTAxLTE0VDE1OjMwOjAwLjAwMFoiLCJpZCI6ImluZi0xMjQifQ=="
+        total:
+          type: integer
+          description: Total number of items matching the filters
+          example: 2000
+
+    DeleteResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: ID of the deleted influencer
+              example: "inf-123"
+
+    # Error Schemas
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Error code for programmatic handling
+              example: "BAD_REQUEST"
+            message:
+              type: string
+              description: Human-readable error message
+              example: "Invalid request body"
+            details:
+              type: object
+              description: Additional error details (optional)
+              properties:
+                fieldErrors:
+                  type: object
+                  description: Field-specific validation errors
+                  additionalProperties:
+                    type: array
+                    items:
+                      type: string
+                  example:
+                    email: ["Invalid email"]
+                    password: ["Password must be at least 6 characters"]
+
+# Common error codes
+# - BAD_REQUEST: Invalid request body or parameters
+# - UNAUTHORIZED: Missing or invalid authentication token
+# - FORBIDDEN: Valid token but insufficient permissions
+# - NOT_FOUND: Requested resource not found
+# - INTERNAL_ERROR: Server-side error
+# - INVALID_CREDENTIALS: Login authentication failed
