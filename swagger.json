@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:3000",
+      "url": "https://wisecode-api-1.onrender.com/",
       "description": "Development server"
     }
   ],
