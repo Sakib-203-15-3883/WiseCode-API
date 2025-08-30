@@ -1,9 +1,9 @@
 {
   "name": "mock-api",
   "version": "1.0.0",
-  "main": "index.js",
+  "type": "module",
   "scripts": {
-    "start": "node scr/local.js",
+    "start": "node src/local.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "api": "node src/local.js",
     "dev": "nodemon src/local.js"
